@@ -1,0 +1,22 @@
+services:
+  # LocalStack for S3 emulation
+  localstack:
+    image: localstack/localstack:latest
+    container_name: onecoremxpy-localstack
+    ports:
+      - "4566:4566"
+      - "4510-4559:4510-4559"
+    environment:
+      - SERVICES=s3
+      - DEBUG=0
+    volumes:
+      - localstack_data:/var/lib/localstack
+    networks:
+      - onecoremxpy-network
+
+volumes:
+  localstack_data:
+
+networks:
+  onecoremxpy-network:
+    driver: bridge

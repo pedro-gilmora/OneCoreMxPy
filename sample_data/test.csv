@@ -1,0 +1,7 @@
+id,nombre,precio,cantidad
+1,Producto A,100.50,10
+2,Producto B,200.00,5
+3,Producto C,,8
+4,Producto D,150.75,
+5,Producto E,invalid,3
+6,Producto A,100.50,10

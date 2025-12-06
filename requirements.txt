@@ -1,0 +1,21 @@
+# Core dependencies
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+pydantic[email]>=2.10.0
+pydantic-settings>=2.6.0
+
+# Database
+sqlalchemy>=2.0.36
+pyodbc>=5.2.0
+
+# Authentication
+python-jose[cryptography]>=3.3.0
+passlib>=1.7.4
+bcrypt==4.2.1
+python-multipart>=0.0.17
+
+# AWS S3 (LocalStack)
+boto3>=1.35.0
+
+# Utilities
+python-dotenv>=1.0.0

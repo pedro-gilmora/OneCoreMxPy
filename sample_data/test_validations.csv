@@ -1,0 +1,8 @@
+nombre,email,precio,cantidad
+Juan Perez,juan@example.com,100.50,5
+Maria Garcia,maria@example.com,200.00,10
+Carlos Lopez,carlos@example.com,150.75,3
+Ana Martinez,ana@example.com,,2
+Pedro Sanchez,pedro@example.com,300.00,
+Roberto Diaz,roberto@example.com,invalid,8
+Juan Perez,juan@example.com,100.50,5
