@@ -1,6 +1,6 @@
 # OneCoreMxPy
 
-API REST con FastAPI para gestión de archivos CSV con autenticación JWT, almacenamiento en S3 (LocalStack) y SQL Server.
+API REST con FastAPI para gestión de archivos CSV, **análisis de documentos con IA** y autenticación JWT, almacenamiento en S3 (LocalStack) y SQL Server.
 
 ## 🚀 Características
 
@@ -9,6 +9,41 @@ API REST con FastAPI para gestión de archivos CSV con autenticación JWT, almac
 - **Subida de archivos CSV**: Con validación automática
 - **Almacenamiento S3**: Usando LocalStack para desarrollo local
 - **Base de datos**: SQL Server LocalDB
+- **📄 Análisis de Documentos con IA**: Clasificación y extracción automática
+- **📜 Módulo Histórico**: Registro de eventos con filtros y exportación Excel
+
+## 🆕 Módulos Web
+
+### 📄 Módulo de Análisis de Documentos
+
+Interfaz web para subir documentos (PDF, JPG, PNG) con análisis automático por IA:
+
+#### Clasificación Automática
+- **Factura**: Documentos con datos económicos/financieros
+- **Información**: Documentos con texto general
+
+#### Extracción de Datos
+
+**Para Facturas:**
+- Cliente (nombre y dirección)
+- Proveedor (nombre y dirección)
+- Número de factura, fecha
+- Productos (cantidad, nombre, precio unitario, total)
+- Total de la factura
+
+**Para Documentos Informativos:**
+- Descripción y resumen del contenido
+- Análisis de sentimiento (positivo, negativo, neutral)
+- Temas clave detectados
+
+### 📜 Módulo Histórico
+
+Pantalla para visualizar el registro de eventos del sistema:
+
+- **Registros**: ID, Tipo, Descripción, Fecha y hora
+- **Tipos de eventos**: Subida de documento, Análisis IA, Interacción usuario, Sistema
+- **Filtros**: Por tipo, descripción o rango de fechas
+- **Exportación**: Descarga en formato Excel
 
 ## 📋 Requisitos
 
@@ -83,6 +118,35 @@ Una vez iniciada la aplicación:
 | GET | `/api/v1/files/{id}` | Obtener archivo | user |
 | GET | `/api/v1/files/{id}/validations` | Ver validaciones | user |
 
+### Documentos (Análisis IA)
+
+| Método | Endpoint | Descripción | Rol Requerido |
+|--------|----------|-------------|---------------|
+| POST | `/api/v1/documents/upload` | Subir y analizar documento | uploader |
+| GET | `/api/v1/documents/` | Listar documentos | user |
+| GET | `/api/v1/documents/{id}` | Obtener detalle del documento | user |
+| DELETE | `/api/v1/documents/{id}` | Eliminar documento | uploader |
+| POST | `/api/v1/documents/{id}/reanalyze` | Re-analizar documento | uploader |
+| GET | `/api/v1/documents/{id}/download` | Descargar documento original | user |
+
+### Histórico de Eventos
+
+| Método | Endpoint | Descripción | Rol Requerido |
+|--------|----------|-------------|---------------|
+| GET | `/api/v1/events/` | Listar eventos (con filtros) | user |
+| GET | `/api/v1/events/{id}` | Obtener detalle del evento | user |
+| GET | `/api/v1/events/types` | Listar tipos de eventos | user |
+| GET | `/api/v1/events/stats` | Estadísticas de eventos | user |
+| GET | `/api/v1/events/export` | Exportar a Excel | admin |
+
+### Interfaz Web
+
+| URL | Descripción |
+|-----|-------------|
+| `/web/login` | Página de inicio de sesión |
+| `/web/documents` | Módulo de análisis de documentos |
+| `/web/events` | Módulo histórico de eventos |
+
 ## 📁 Estructura del Proyecto
 
 ```
@@ -93,7 +157,10 @@ OneCoreMxPy/
 │   ├── api/
 │   │   ├── __init__.py
 │   │   ├── auth.py          # Endpoints de autenticación
-│   │   └── files.py         # Endpoints de archivos
+│   │   ├── files.py         # Endpoints de archivos CSV
+│   │   ├── documents.py     # Endpoints de análisis de documentos
+│   │   ├── events.py        # Endpoints de histórico
+│   │   └── web.py           # Rutas de interfaz web
 │   ├── core/
 │   │   ├── __init__.py
 │   │   ├── config.py        # Configuración con Pydantic
@@ -105,10 +172,20 @@ OneCoreMxPy/
 │   ├── schemas/
 │   │   ├── __init__.py
 │   │   └── schemas.py       # Schemas Pydantic
-│   └── services/
-│       ├── __init__.py
-│       ├── csv_service.py   # Validación de CSV
-│       └── s3_service.py    # Operaciones S3
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── csv_service.py       # Validación de CSV
+│   │   ├── s3_service.py        # Operaciones S3
+│   │   ├── document_service.py  # Análisis de documentos con IA
+│   │   └── event_service.py     # Gestión de eventos
+│   └── templates/
+│       ├── base.html            # Template base
+│       ├── login.html           # Página de login
+│       ├── documents.html       # Módulo de documentos
+│       └── events.html          # Módulo histórico
+├── tests/
+│   ├── test_document_service.py
+│   └── test_event_service.py
 ├── .env                     # Variables de entorno (no commitear)
 ├── .env.example             # Ejemplo de variables
 ├── docker-compose.yml       # LocalStack
@@ -165,6 +242,10 @@ Variables de entorno disponibles en `.env`:
 | `DB_NAME` | Nombre de base de datos | OneCoreMxPy |
 | `S3_ENDPOINT_URL` | URL de LocalStack | http://localhost:4566 |
 | `S3_BUCKET_NAME` | Nombre del bucket S3 | onecoremxpy-bucket |
+| `OPENAI_API_KEY` | API Key de OpenAI (para análisis IA) | (opcional) |
+| `OPENAI_MODEL` | Modelo de OpenAI | gpt-4o |
+| `DOCUMENT_ALLOWED_EXTENSIONS` | Extensiones de documentos | pdf,jpg,jpeg,png |
+| `MAX_DOCUMENT_SIZE_MB` | Tamaño máximo de documento | 20 |
 
 ## 📝 Validaciones de CSV
 

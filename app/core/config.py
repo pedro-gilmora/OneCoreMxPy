@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     max_file_size_mb: int = Field(default=10)
     allowed_extensions: str = Field(default="csv")
     
+    # Document Analysis Configuration
+    document_allowed_extensions: str = Field(default="pdf,jpg,jpeg,png")
+    max_document_size_mb: int = Field(default=20)
+    
+    # OpenAI Configuration (for Document Analysis)
+    openai_api_key: str = Field(default="")
+    openai_model: str = Field(default="gpt-4o")
+    
     @property
     def database_url(self) -> str:
         """Generate the database connection URL for SQLAlchemy."""
@@ -53,6 +61,16 @@ class Settings(BaseSettings):
     def allowed_extensions_list(self) -> list[str]:
         """Get allowed extensions as a list."""
         return [ext.strip().lower() for ext in self.allowed_extensions.split(",")]
+    
+    @property
+    def document_allowed_extensions_list(self) -> list[str]:
+        """Get allowed document extensions as a list."""
+        return [ext.strip().lower() for ext in self.document_allowed_extensions.split(",")]
+    
+    @property
+    def max_document_size_bytes(self) -> int:
+        """Convert max document size from MB to bytes."""
+        return self.max_document_size_mb * 1024 * 1024
     
     class Config:
         env_file = ".env"

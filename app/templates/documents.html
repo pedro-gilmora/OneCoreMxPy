@@ -1,0 +1,692 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1">
+            <i class="bi bi-file-earmark-text text-primary me-2"></i>
+            Análisis de Documentos
+        </h2>
+        <p class="text-muted mb-0">Sube documentos PDF, JPG o PNG para análisis automático con IA</p>
+    </div>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
+        <i class="bi bi-cloud-upload me-2"></i>
+        Subir Documento
+    </button>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4" id="statsCards">
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-1 opacity-75">Total Documentos</h6>
+                    <h3 class="mb-0" id="totalDocs">0</h3>
+                </div>
+                <i class="bi bi-files" style="font-size: 2rem; opacity: 0.5;"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card success">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-1 opacity-75">Facturas</h6>
+                    <h3 class="mb-0" id="invoiceDocs">0</h3>
+                </div>
+                <i class="bi bi-receipt" style="font-size: 2rem; opacity: 0.5;"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card info">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-1 opacity-75">Información</h6>
+                    <h3 class="mb-0" id="infoDocs">0</h3>
+                </div>
+                <i class="bi bi-file-text" style="font-size: 2rem; opacity: 0.5;"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card warning">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-1 opacity-75">Procesando</h6>
+                    <h3 class="mb-0" id="processingDocs">0</h3>
+                </div>
+                <i class="bi bi-hourglass-split" style="font-size: 2rem; opacity: 0.5;"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body py-3">
+        <div class="row align-items-center">
+            <div class="col-md-4">
+                <div class="input-group">
+                    <span class="input-group-text bg-white">
+                        <i class="bi bi-filter"></i>
+                    </span>
+                    <select class="form-select" id="typeFilter">
+                        <option value="">Todos los tipos</option>
+                        <option value="factura">Factura</option>
+                        <option value="informacion">Información</option>
+                        <option value="pendiente">Pendiente</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <select class="form-select" id="statusFilter">
+                    <option value="">Todos los estados</option>
+                    <option value="completed">Completado</option>
+                    <option value="processing">Procesando</option>
+                    <option value="failed">Fallido</option>
+                </select>
+            </div>
+            <div class="col-md-4 text-end">
+                <button class="btn btn-outline-secondary" onclick="loadDocuments()">
+                    <i class="bi bi-arrow-clockwise me-1"></i>
+                    Actualizar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Documents Table -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-table me-2"></i>Documentos</span>
+        <span class="badge bg-secondary" id="docsCount">0 documentos</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Archivo</th>
+                        <th>Tipo</th>
+                        <th>Estado</th>
+                        <th>Tamaño</th>
+                        <th>Fecha</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="documentsTable">
+                    <tr>
+                        <td colspan="6" class="text-center py-5 text-muted">
+                            <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                            <p class="mt-2">No hay documentos</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Modal -->
+<div class="modal fade" id="uploadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-cloud-upload me-2"></i>
+                    Subir Documento
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="upload-zone" id="uploadZone">
+                    <i class="bi bi-file-earmark-arrow-up"></i>
+                    <h5>Arrastra tu documento aquí</h5>
+                    <p class="text-muted mb-0">o haz clic para seleccionar</p>
+                    <small class="text-muted">PDF, JPG, PNG (máx. 20MB)</small>
+                    <input type="file" id="fileInput" class="d-none" accept=".pdf,.jpg,.jpeg,.png">
+                </div>
+                
+                <div id="filePreview" class="mt-3 d-none">
+                    <div class="d-flex align-items-center p-3 bg-light rounded">
+                        <i class="bi bi-file-earmark text-primary me-3" style="font-size: 2rem;"></i>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-0" id="selectedFileName">archivo.pdf</h6>
+                            <small class="text-muted" id="selectedFileSize">0 KB</small>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearFile()">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="uploadProgress" class="mt-3 d-none">
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             style="width: 0%" id="progressBar"></div>
+                    </div>
+                    <p class="text-center text-muted mt-2 mb-0" id="uploadStatus">Subiendo...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="uploadBtn" onclick="uploadDocument()" disabled>
+                    <i class="bi bi-upload me-1"></i>
+                    Subir y Analizar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Document Detail Modal -->
+<div class="modal fade" id="detailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="detailModalTitle">
+                    <i class="bi bi-file-earmark-text me-2"></i>
+                    Detalles del Documento
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detailModalBody">
+                <!-- Content loaded dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="btn btn-outline-primary" id="downloadBtn">
+                    <i class="bi bi-download me-1"></i>
+                    Descargar
+                </button>
+                <button type="button" class="btn btn-primary" id="reanalyzeBtn">
+                    <i class="bi bi-arrow-clockwise me-1"></i>
+                    Re-analizar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let selectedFile = null;
+    let currentDocumentId = null;
+    
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', function() {
+        loadDocuments();
+        setupUploadZone();
+        
+        // Filter change handlers
+        document.getElementById('typeFilter').addEventListener('change', loadDocuments);
+        document.getElementById('statusFilter').addEventListener('change', loadDocuments);
+    });
+    
+    // Setup upload zone drag and drop
+    function setupUploadZone() {
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+        
+        uploadZone.addEventListener('click', () => fileInput.click());
+        
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('drag-over');
+        });
+        
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('drag-over');
+        });
+        
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('drag-over');
+            if (e.dataTransfer.files.length) {
+                handleFileSelect(e.dataTransfer.files[0]);
+            }
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) {
+                handleFileSelect(e.target.files[0]);
+            }
+        });
+    }
+    
+    // Handle file selection
+    function handleFileSelect(file) {
+        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+        const maxSize = 20 * 1024 * 1024; // 20MB
+        
+        if (!allowedTypes.includes(file.type)) {
+            showToast('Tipo de archivo no permitido. Use PDF, JPG o PNG.', 'error');
+            return;
+        }
+        
+        if (file.size > maxSize) {
+            showToast('El archivo excede el tamaño máximo de 20MB.', 'error');
+            return;
+        }
+        
+        selectedFile = file;
+        document.getElementById('selectedFileName').textContent = file.name;
+        document.getElementById('selectedFileSize').textContent = formatFileSize(file.size);
+        document.getElementById('filePreview').classList.remove('d-none');
+        document.getElementById('uploadBtn').disabled = false;
+    }
+    
+    // Clear selected file
+    function clearFile() {
+        selectedFile = null;
+        document.getElementById('fileInput').value = '';
+        document.getElementById('filePreview').classList.add('d-none');
+        document.getElementById('uploadBtn').disabled = true;
+    }
+    
+    // Upload document
+    async function uploadDocument() {
+        if (!selectedFile) return;
+        
+        const uploadBtn = document.getElementById('uploadBtn');
+        const progressDiv = document.getElementById('uploadProgress');
+        const progressBar = document.getElementById('progressBar');
+        const uploadStatus = document.getElementById('uploadStatus');
+        
+        uploadBtn.disabled = true;
+        progressDiv.classList.remove('d-none');
+        progressBar.style.width = '0%';
+        uploadStatus.textContent = 'Subiendo documento...';
+        
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        
+        try {
+            // Simulate progress
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += Math.random() * 20;
+                if (progress > 90) progress = 90;
+                progressBar.style.width = progress + '%';
+            }, 200);
+            
+            uploadStatus.textContent = 'Analizando con IA...';
+            
+            const response = await apiRequest('/documents/upload', {
+                method: 'POST',
+                body: formData
+            });
+            
+            clearInterval(progressInterval);
+            progressBar.style.width = '100%';
+            
+            if (response.ok) {
+                uploadStatus.textContent = '¡Análisis completado!';
+                showToast('Documento analizado exitosamente', 'success');
+                
+                setTimeout(() => {
+                    bootstrap.Modal.getInstance(document.getElementById('uploadModal')).hide();
+                    clearFile();
+                    progressDiv.classList.add('d-none');
+                    loadDocuments();
+                }, 1000);
+            } else {
+                const error = await response.json();
+                throw new Error(error.detail || 'Error al subir documento');
+            }
+        } catch (error) {
+            uploadStatus.textContent = 'Error: ' + error.message;
+            progressBar.classList.add('bg-danger');
+            showToast(error.message, 'error');
+        } finally {
+            uploadBtn.disabled = false;
+        }
+    }
+    
+    // Load documents list
+    async function loadDocuments() {
+        const typeFilter = document.getElementById('typeFilter').value;
+        const statusFilter = document.getElementById('statusFilter').value;
+        
+        let url = '/documents/?page=1&page_size=100';
+        if (typeFilter) url += `&type_filter=${typeFilter}`;
+        if (statusFilter) url += `&status_filter=${statusFilter}`;
+        
+        try {
+            const response = await apiRequest(url);
+            
+            if (response.ok) {
+                const documents = await response.json();
+                renderDocuments(documents);
+                updateStats(documents);
+            }
+        } catch (error) {
+            showToast('Error al cargar documentos', 'error');
+        }
+    }
+    
+    // Render documents table
+    function renderDocuments(documents) {
+        const tbody = document.getElementById('documentsTable');
+        document.getElementById('docsCount').textContent = `${documents.length} documentos`;
+        
+        if (documents.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center py-5 text-muted">
+                        <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                        <p class="mt-2">No hay documentos</p>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        tbody.innerHTML = documents.map(doc => {
+            const typeBadge = {
+                'factura': '<span class="badge badge-factura">Factura</span>',
+                'informacion': '<span class="badge badge-informacion">Información</span>',
+                'pendiente': '<span class="badge badge-pendiente">Pendiente</span>'
+            }[doc.document_type] || '<span class="badge bg-secondary">Desconocido</span>';
+            
+            const statusBadge = {
+                'completed': '<span class="badge bg-success">Completado</span>',
+                'processing': '<span class="badge bg-warning text-dark">Procesando</span>',
+                'failed': '<span class="badge bg-danger">Fallido</span>',
+                'pending': '<span class="badge bg-secondary">Pendiente</span>'
+            }[doc.analysis_status] || '<span class="badge bg-secondary">Desconocido</span>';
+            
+            const fileIcon = doc.original_filename.endsWith('.pdf') ? 'bi-file-pdf' : 'bi-file-image';
+            
+            return `
+                <tr>
+                    <td>
+                        <i class="bi ${fileIcon} text-danger me-2"></i>
+                        ${doc.original_filename}
+                    </td>
+                    <td>${typeBadge}</td>
+                    <td>${statusBadge}</td>
+                    <td>${formatFileSize(doc.file_size || 0)}</td>
+                    <td>${formatDate(doc.created_at)}</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-primary btn-action me-1" 
+                                onclick="viewDocument(${doc.id})" title="Ver detalles">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger btn-action" 
+                                onclick="deleteDocument(${doc.id})" title="Eliminar">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+    
+    // Update statistics
+    function updateStats(documents) {
+        document.getElementById('totalDocs').textContent = documents.length;
+        document.getElementById('invoiceDocs').textContent = documents.filter(d => d.document_type === 'factura').length;
+        document.getElementById('infoDocs').textContent = documents.filter(d => d.document_type === 'informacion').length;
+        document.getElementById('processingDocs').textContent = documents.filter(d => d.analysis_status === 'processing').length;
+    }
+    
+    // View document details
+    async function viewDocument(docId) {
+        currentDocumentId = docId;
+        showLoading();
+        
+        try {
+            const response = await apiRequest(`/documents/${docId}`);
+            
+            if (response.ok) {
+                const doc = await response.json();
+                renderDocumentDetail(doc);
+                
+                const modal = new bootstrap.Modal(document.getElementById('detailModal'));
+                modal.show();
+            }
+        } catch (error) {
+            showToast('Error al cargar documento', 'error');
+        } finally {
+            hideLoading();
+        }
+    }
+    
+    // Render document detail
+    function renderDocumentDetail(doc) {
+        const title = document.getElementById('detailModalTitle');
+        const body = document.getElementById('detailModalBody');
+        
+        title.innerHTML = `
+            <i class="bi bi-file-earmark-text me-2"></i>
+            ${doc.original_filename}
+        `;
+        
+        let content = `
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <h6 class="text-muted mb-2">Información General</h6>
+                    <table class="table table-sm">
+                        <tr><th>Tipo:</th><td>${getTypeBadge(doc.document_type)}</td></tr>
+                        <tr><th>Estado:</th><td>${getStatusBadge(doc.analysis_status)}</td></tr>
+                        <tr><th>Tamaño:</th><td>${formatFileSize(doc.file_size || 0)}</td></tr>
+                        <tr><th>Fecha:</th><td>${formatDate(doc.created_at)}</td></tr>
+                    </table>
+                </div>
+            </div>
+        `;
+        
+        if (doc.document_type === 'factura' && doc.invoice_data) {
+            const inv = doc.invoice_data;
+            content += `
+                <hr>
+                <h5 class="mb-3"><i class="bi bi-receipt me-2"></i>Datos de Factura Extraídos</h5>
+                
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title"><i class="bi bi-building me-1"></i>Proveedor</h6>
+                                <p class="mb-1"><strong>${inv.provider_name || 'No detectado'}</strong></p>
+                                <small class="text-muted">${inv.provider_address || 'Sin dirección'}</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title"><i class="bi bi-person me-1"></i>Cliente</h6>
+                                <p class="mb-1"><strong>${inv.client_name || 'No detectado'}</strong></p>
+                                <small class="text-muted">${inv.client_address || 'Sin dirección'}</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <strong>Número:</strong> ${inv.invoice_number || 'N/A'}
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Fecha:</strong> ${inv.invoice_date || 'N/A'}
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Total:</strong> 
+                        <span class="fs-5 text-success">${inv.currency || '$'} ${inv.invoice_total?.toFixed(2) || '0.00'}</span>
+                    </div>
+                </div>
+            `;
+            
+            if (inv.products && inv.products.length > 0) {
+                content += `
+                    <h6 class="mb-2">Productos/Servicios</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm product-table">
+                            <thead>
+                                <tr>
+                                    <th>Cantidad</th>
+                                    <th>Descripción</th>
+                                    <th class="text-end">P. Unit.</th>
+                                    <th class="text-end">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${inv.products.map(p => `
+                                    <tr>
+                                        <td>${p.quantity || '-'}</td>
+                                        <td>${p.name || '-'}</td>
+                                        <td class="text-end">${p.unit_price?.toFixed(2) || '-'}</td>
+                                        <td class="text-end">${p.total?.toFixed(2) || '-'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+        }
+        
+        if (doc.document_type === 'informacion' && doc.info_data) {
+            const info = doc.info_data;
+            const sentimentClass = {
+                'positivo': 'sentiment-positive',
+                'negativo': 'sentiment-negative',
+                'neutral': 'sentiment-neutral'
+            }[info.sentiment] || '';
+            
+            const sentimentIcon = {
+                'positivo': 'bi-emoji-smile',
+                'negativo': 'bi-emoji-frown',
+                'neutral': 'bi-emoji-neutral'
+            }[info.sentiment] || 'bi-emoji-neutral';
+            
+            content += `
+                <hr>
+                <h5 class="mb-3"><i class="bi bi-file-text me-2"></i>Análisis de Información</h5>
+                
+                <div class="mb-3">
+                    <h6>Descripción</h6>
+                    <p>${info.description || 'No disponible'}</p>
+                </div>
+                
+                <div class="mb-3">
+                    <h6>Resumen</h6>
+                    <p>${info.summary || 'No disponible'}</p>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <h6>Sentimiento</h6>
+                        <div class="d-flex align-items-center ${sentimentClass}">
+                            <i class="bi ${sentimentIcon} me-2" style="font-size: 2rem;"></i>
+                            <div>
+                                <strong class="text-capitalize">${info.sentiment || 'No analizado'}</strong>
+                                ${info.sentiment_score !== null ? `<br><small>Score: ${info.sentiment_score.toFixed(2)}</small>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Temas Clave</h6>
+                        <div>
+                            ${(info.key_topics || []).map(t => `<span class="badge bg-secondary me-1">${t}</span>`).join('') || 'Ninguno detectado'}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        if (doc.analysis_error) {
+            content += `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Error en análisis:</strong> ${doc.analysis_error}
+                </div>
+            `;
+        }
+        
+        body.innerHTML = content;
+        
+        // Setup buttons
+        document.getElementById('downloadBtn').onclick = () => downloadDocument(doc.id);
+        document.getElementById('reanalyzeBtn').onclick = () => reanalyzeDocument(doc.id);
+    }
+    
+    function getTypeBadge(type) {
+        const badges = {
+            'factura': '<span class="badge badge-factura">Factura</span>',
+            'informacion': '<span class="badge badge-informacion">Información</span>',
+            'pendiente': '<span class="badge badge-pendiente">Pendiente</span>'
+        };
+        return badges[type] || '<span class="badge bg-secondary">Desconocido</span>';
+    }
+    
+    function getStatusBadge(status) {
+        const badges = {
+            'completed': '<span class="badge bg-success">Completado</span>',
+            'processing': '<span class="badge bg-warning text-dark">Procesando</span>',
+            'failed': '<span class="badge bg-danger">Fallido</span>',
+            'pending': '<span class="badge bg-secondary">Pendiente</span>'
+        };
+        return badges[status] || '<span class="badge bg-secondary">Desconocido</span>';
+    }
+    
+    // Download document
+    async function downloadDocument(docId) {
+        window.open(`${API_BASE}/documents/${docId}/download`, '_blank');
+    }
+    
+    // Re-analyze document
+    async function reanalyzeDocument(docId) {
+        if (!confirm('¿Desea re-analizar este documento?')) return;
+        
+        showLoading();
+        
+        try {
+            const response = await apiRequest(`/documents/${docId}/reanalyze`, {
+                method: 'POST'
+            });
+            
+            if (response.ok) {
+                const doc = await response.json();
+                renderDocumentDetail(doc);
+                showToast('Documento re-analizado exitosamente', 'success');
+                loadDocuments();
+            } else {
+                const error = await response.json();
+                throw new Error(error.detail || 'Error al re-analizar');
+            }
+        } catch (error) {
+            showToast(error.message, 'error');
+        } finally {
+            hideLoading();
+        }
+    }
+    
+    // Delete document
+    async function deleteDocument(docId) {
+        if (!confirm('¿Está seguro de eliminar este documento?')) return;
+        
+        showLoading();
+        
+        try {
+            const response = await apiRequest(`/documents/${docId}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                showToast('Documento eliminado', 'success');
+                loadDocuments();
+            }
+        } catch (error) {
+            showToast('Error al eliminar documento', 'error');
+        } finally {
+            hideLoading();
+        }
+    }
+</script>
+{% endblock %}

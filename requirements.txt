@@ -19,3 +19,18 @@ boto3>=1.35.0
 
 # Utilities
 python-dotenv>=1.0.0
+
+# Document Analysis (AI Module)
+openai>=1.0.0
+pdf2image>=1.16.0
+PyPDF2>=3.0.0
+Pillow>=10.0.0
+pytesseract>=0.3.10
+
+# Excel Export
+openpyxl>=3.1.0
+xlsxwriter>=3.1.0
+
+# Web Interface
+jinja2>=3.1.0
+aiofiles>=23.0.0

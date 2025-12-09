@@ -4,10 +4,12 @@ FastAPI Application Entry Point.
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from app.core.config import get_settings
 from app.core.database import init_db
 from app.services.s3_service import get_s3_service
-from app.api import auth, files
+from app.api import auth, files, documents, events, web
 
 settings = get_settings()
 
@@ -40,7 +42,7 @@ app = FastAPI(
     description="""
 ## OneCoreMxPy API
 
-API para gestión de archivos CSV con autenticación JWT.
+API para gestión de archivos y análisis de documentos con IA.
 
 ### Características:
 - 🔐 Autenticación JWT con roles
@@ -48,10 +50,19 @@ API para gestión de archivos CSV con autenticación JWT.
 - ✅ Validación automática de archivos CSV
 - 💾 Almacenamiento en SQL Server
 - 🔄 Renovación de tokens
+- 📄 **Análisis de documentos con IA** (PDF, JPG, PNG)
+- 🧾 **Extracción automática de datos de facturas**
+- 📊 **Análisis de sentimiento de documentos informativos**
+- 📜 **Módulo histórico de eventos**
+- 📥 **Exportación a Excel**
+
+### Módulos Web:
+- **Análisis de Documentos**: Clasifica documentos como Factura o Información
+- **Histórico**: Registro de eventos del sistema con filtros y exportación
 
 ### Roles:
 - **user**: Usuario básico
-- **uploader**: Puede subir archivos CSV
+- **uploader**: Puede subir archivos CSV y documentos
 - **admin**: Acceso completo
     """,
     docs_url="/docs",
@@ -71,6 +82,11 @@ app.add_middleware(
 # Include API routers
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(files.router, prefix="/api/v1")
+app.include_router(documents.router, prefix="/api/v1")
+app.include_router(events.router, prefix="/api/v1")
+
+# Include Web interface router
+app.include_router(web.router)
 
 
 @app.get("/", tags=["Health"])
@@ -91,4 +107,9 @@ async def health_check():
         "status": "healthy",
         "app_name": settings.app_name,
         "version": settings.app_version,
+        "modules": {
+            "document_analysis": True,
+            "event_history": True,
+            "ai_enabled": bool(settings.openai_api_key)
+        }
     }
