@@ -79,6 +79,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static files
+from pathlib import Path
+static_dir = Path(__file__).parent / "static"
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
 # Include API routers
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(files.router, prefix="/api/v1")
