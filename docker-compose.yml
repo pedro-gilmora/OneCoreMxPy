@@ -13,9 +13,65 @@ services:
       - localstack_data:/var/lib/localstack
     networks:
       - onecoremxpy-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # SQL Server Database
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: onecoremxpy-sqlserver
+    ports:
+      - "1433:1433"
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=OneCoreMxPy123!
+      - MSSQL_PID=Express
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - onecoremxpy-network
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "OneCoreMxPy123!" -C -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # FastAPI Web Application
+  webapp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: onecoremxpy-webapp
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      # Mount sample data for development/testing
+      - ./sample_data:/app/sample_data:ro
+    depends_on:
+      localstack:
+        condition: service_healthy
+      sqlserver:
+        condition: service_healthy
+    networks:
+      - onecoremxpy-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 volumes:
   localstack_data:
+  sqlserver_data:
 
 networks:
   onecoremxpy-network:

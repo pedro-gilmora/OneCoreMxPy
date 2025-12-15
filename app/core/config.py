@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     db_server: str = Field(default=r"(localdb)\MSSQLLocalDB")
     db_name: str = Field(default="OneCoreMxPy")
     db_driver: str = Field(default="ODBC Driver 17 for SQL Server")
+    db_user: str = Field(default="")  # Empty for Windows Auth (LocalDB)
+    db_password: str = Field(default="")  # Empty for Windows Auth (LocalDB)
     
     # AWS S3 / LocalStack Configuration
     aws_access_key_id: str = Field(default="test")
@@ -47,6 +49,12 @@ class Settings(BaseSettings):
     @property
     def database_url(self) -> str:
         """Generate the database connection URL for SQLAlchemy."""
+        # Use SQL Server authentication if username/password provided
+        if self.db_user and self.db_password:
+            return (
+                f"mssql+pyodbc://{self.db_user}:{self.db_password}@{self.db_server}/{self.db_name}"
+                f"?driver={self.db_driver.replace(' ', '+')}&TrustServerCertificate=yes"
+            )
         return (
             f"mssql+pyodbc://@{self.db_server}/{self.db_name}"
             f"?driver={self.db_driver.replace(' ', '+')}&TrustServerCertificate=yes"
