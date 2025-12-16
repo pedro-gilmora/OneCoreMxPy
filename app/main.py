@@ -18,21 +18,21 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     """Application lifespan events."""
     # Startup
-    print("🚀 Starting application...")
+    print("[START] Starting application...")
     
     # Initialize database tables
-    print("📦 Initializing database...")
+    print("[DB] Initializing database...")
     init_db()
     
     # Initialize S3 bucket
-    print("🪣 Ensuring S3 bucket exists...")
+    print("[S3] Ensuring S3 bucket exists...")
     s3_service = get_s3_service()
     s3_service.ensure_bucket_exists()
     
     yield
     
     # Shutdown
-    print("👋 Shutting down application...")
+    print("[STOP] Shutting down application...")
 
 
 # Create FastAPI application

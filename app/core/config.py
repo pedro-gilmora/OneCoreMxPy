@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     @property
     def database_url(self) -> str:
         """Generate the database connection URL for SQLAlchemy."""
+        # Check if DATABASE_URL env var is set (for local SQLite testing)
+        import os
+        if os.getenv("DATABASE_URL"):
+            return os.getenv("DATABASE_URL")
+        
         # Use SQL Server authentication if username/password provided
         if self.db_user and self.db_password:
             return (
@@ -84,6 +89,7 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = False
+        extra = "ignore"  # Ignore extra environment variables not defined in Settings
 
 
 @lru_cache()

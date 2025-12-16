@@ -7,11 +7,13 @@ import io
 from typing import Optional, Tuple
 from functools import lru_cache
 
-from openai import OpenAI
+from openai import AsyncOpenAI
 from PIL import Image
 import PyPDF2
 
 from app.core.config import get_settings
+from app.core.database import SessionLocal
+from app.models.models import Document, InvoiceData, InfoData
 from app.schemas.schemas import (
     DocumentTypeEnum,
     DocumentAnalysisResult,
@@ -25,18 +27,89 @@ settings = get_settings()
 
 
 class DocumentService:
-    """Service class for document analysis using OpenAI."""
+    """Service class for document analysis using Microsoft Semantic Kernel."""
     
     def __init__(self):
         """Initialize OpenAI client."""
         self.client = None
+        # Use model from settings, fallback to gpt-4o-mini
+        self.model = settings.openai_model if settings.openai_model else "gpt-4o-mini"
+        
         if settings.openai_api_key:
-            self.client = OpenAI(api_key=settings.openai_api_key)
-        self.model = settings.openai_model
+            try:
+                self.client = AsyncOpenAI(api_key=settings.openai_api_key)
+            except Exception as e:
+                print(f"Warning: Failed to initialize OpenAI client: {e}")
+                self.client = None
+        
+        self.db = SessionLocal()
     
     def _is_ai_available(self) -> bool:
         """Check if AI service is available."""
         return self.client is not None and settings.openai_api_key
+    
+    def _save_to_database(self, document: Document):
+        """Save or update document in database."""
+        try:
+            self.db.merge(document)
+            self.db.commit()
+        except Exception as e:
+            self.db.rollback()
+            print(f"Error saving document to database: {e}")
+    
+    def _get_document_by_s3_key(self, s3_key: str) -> Optional[Document]:
+        """Retrieve document from database by S3 key."""
+        try:
+            from app.models.models import Document as DocumentModel
+            return self.db.query(DocumentModel).filter(DocumentModel.s3_key == s3_key).first()
+        except Exception as e:
+            print(f"Error retrieving document: {e}")
+            return None
+    
+    def get_all_documents(self, user_id: int = None) -> list:
+        """Retrieve all documents from database, optionally filtered by user."""
+        try:
+            from app.models.models import Document as DocumentModel
+            query = self.db.query(DocumentModel)
+            if user_id:
+                query = query.filter(DocumentModel.user_id == user_id)
+            return query.all()
+        except Exception as e:
+            print(f"Error retrieving documents: {e}")
+            return []
+    
+    def get_document_by_id(self, doc_id: int) -> Optional[Document]:
+        """Retrieve specific document from database by ID."""
+        try:
+            from app.models.models import Document as DocumentModel
+            return self.db.query(DocumentModel).filter(DocumentModel.id == doc_id).first()
+        except Exception as e:
+            print(f"Error retrieving document by ID: {e}")
+            return None
+    
+    def query_invoices(self, user_id: int = None) -> list:
+        """Query all invoices from database, optionally filtered by user."""
+        try:
+            from app.models.models import Document as DocumentModel, InvoiceData
+            query = self.db.query(InvoiceData).join(DocumentModel)
+            if user_id:
+                query = query.filter(DocumentModel.user_id == user_id)
+            return query.all()
+        except Exception as e:
+            print(f"Error querying invoices: {e}")
+            return []
+    
+    def query_info_documents(self, user_id: int = None) -> list:
+        """Query all information documents from database, optionally filtered by user."""
+        try:
+            from app.models.models import Document as DocumentModel, InfoData
+            query = self.db.query(InfoData).join(DocumentModel)
+            if user_id:
+                query = query.filter(DocumentModel.user_id == user_id)
+            return query.all()
+        except Exception as e:
+            print(f"Error querying info documents: {e}")
+            return []
     
     def _extract_text_from_pdf(self, file_content: bytes) -> str:
         """Extract text content from PDF file."""
@@ -150,15 +223,20 @@ Responde ÚNICAMENTE con un JSON en el siguiente formato:
         self,
         file_content: bytes,
         content_type: str,
-        filename: str
+        filename: str,
+        s3_key: str = None,
+        user_id: int = None
     ) -> DocumentAnalysisResult:
         """
-        Analyze a document using OpenAI to classify and extract data.
+        Analyze a document using Semantic Kernel to classify and extract data.
+        Results are stored in the SQL database.
         
         Args:
             file_content: The document content as bytes
             content_type: MIME type of the document
             filename: Original filename
+            s3_key: S3 key for file location
+            user_id: User ID who uploaded the document
             
         Returns:
             DocumentAnalysisResult with classification and extracted data
@@ -200,6 +278,65 @@ Responde ÚNICAMENTE con un JSON en el siguiente formato:
             )
             raw_text = extraction_text or raw_text
         
+        # Step 3: Save to database
+        if s3_key:
+            try:
+                from app.models.models import Document as DocumentModel
+                from app.models.models import InvoiceData as InvoiceDataModel
+                from app.models.models import InfoData as InfoDataModel
+                from app.models.models import InvoiceProduct as InvoiceProductModel
+                from datetime import datetime
+                
+                document = DocumentModel(
+                    filename=filename,
+                    original_filename=filename,
+                    s3_key=s3_key,
+                    file_size=len(file_content),
+                    content_type=content_type,
+                    document_type=doc_type.value,
+                    analysis_status="completed",
+                    user_id=user_id
+                )
+                
+                self.db.add(document)
+                self.db.flush()  # Flush to get the document ID
+                
+                # If invoice data, save to database
+                if invoice_data:
+                    inv = InvoiceDataModel(
+                        document_id=document.id,
+                        client_name=invoice_data.client_name,
+                        client_address=invoice_data.client_address,
+                        provider_name=invoice_data.provider_name,
+                        provider_address=invoice_data.provider_address,
+                        invoice_number=invoice_data.invoice_number,
+                        invoice_date=invoice_data.invoice_date,
+                        invoice_total=invoice_data.invoice_total,
+                        currency=invoice_data.currency,
+                        products_json=json.dumps([p.dict() for p in invoice_data.products]) if invoice_data.products else "[]",
+                        raw_text=raw_text
+                    )
+                    self.db.add(inv)
+                
+                # If info data, save to database
+                if info_data:
+                    info = InfoDataModel(
+                        document_id=document.id,
+                        description=info_data.description,
+                        summary=info_data.summary,
+                        sentiment=info_data.sentiment,
+                        sentiment_score=info_data.sentiment_score,
+                        key_topics_json=json.dumps(info_data.key_topics) if info_data.key_topics else "[]",
+                        raw_text=raw_text
+                    )
+                    self.db.add(info)
+                
+                self.db.commit()
+                    
+            except Exception as e:
+                self.db.rollback()
+                print(f"Error saving analysis results to database: {e}")
+        
         return DocumentAnalysisResult(
             document_type=doc_type,
             confidence=confidence,
@@ -217,37 +354,26 @@ Responde ÚNICAMENTE con un JSON en el siguiente formato:
     ) -> Tuple[DocumentTypeEnum, float]:
         """Classify the document type using OpenAI."""
         try:
-            messages = [
-                {"role": "system", "content": self._get_classification_prompt()}
-            ]
+            # Build the prompt with document content
+            system_prompt = self._get_classification_prompt()
             
             if is_image:
-                # Use vision API for images
                 base64_image = self._encode_image_to_base64(file_content, content_type)
-                messages.append({
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": "Clasifica este documento:"},
-                        {"type": "image_url", "image_url": {"url": base64_image}}
-                    ]
-                })
+                user_message = f"Clasifica este documento:\n\n{base64_image}"
             else:
-                # Use text for PDFs
-                messages.append({
-                    "role": "user",
-                    "content": f"Clasifica este documento:\n\n{raw_text[:4000]}"
-                })
+                user_message = f"Clasifica este documento:\n\n{raw_text[:4000]}"
             
-            response = self.client.chat.completions.create(
+            # Call OpenAI API
+            response = await self.client.chat.completions.create(
                 model=self.model,
-                messages=messages,
-                max_tokens=200,
-                temperature=0.1
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message}
+                ]
             )
             
             result_text = response.choices[0].message.content.strip()
             
-            # Parse JSON response
             # Clean up the response if it contains markdown code blocks
             if "```json" in result_text:
                 result_text = result_text.split("```json")[1].split("```")[0]
@@ -273,30 +399,20 @@ Responde ÚNICAMENTE con un JSON en el siguiente formato:
     ) -> Tuple[Optional[InvoiceDataBase], str]:
         """Extract invoice data using OpenAI."""
         try:
-            messages = [
-                {"role": "system", "content": self._get_invoice_extraction_prompt()}
-            ]
+            system_prompt = self._get_invoice_extraction_prompt()
             
             if is_image:
                 base64_image = self._encode_image_to_base64(file_content, content_type)
-                messages.append({
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": "Extrae los datos de esta factura:"},
-                        {"type": "image_url", "image_url": {"url": base64_image}}
-                    ]
-                })
+                user_message = f"Extrae los datos de esta factura:\n\n{base64_image}"
             else:
-                messages.append({
-                    "role": "user",
-                    "content": f"Extrae los datos de esta factura:\n\n{raw_text[:8000]}"
-                })
+                user_message = f"Extrae los datos de esta factura:\n\n{raw_text[:8000]}"
             
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model=self.model,
-                messages=messages,
-                max_tokens=2000,
-                temperature=0.1
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message}
+                ]
             )
             
             result_text = response.choices[0].message.content.strip()
@@ -346,30 +462,20 @@ Responde ÚNICAMENTE con un JSON en el siguiente formato:
     ) -> Tuple[Optional[InfoDataBase], str]:
         """Extract information document data using OpenAI."""
         try:
-            messages = [
-                {"role": "system", "content": self._get_info_extraction_prompt()}
-            ]
+            system_prompt = self._get_info_extraction_prompt()
             
             if is_image:
                 base64_image = self._encode_image_to_base64(file_content, content_type)
-                messages.append({
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": "Analiza este documento:"},
-                        {"type": "image_url", "image_url": {"url": base64_image}}
-                    ]
-                })
+                user_message = f"Analiza este documento:\n\n{base64_image}"
             else:
-                messages.append({
-                    "role": "user",
-                    "content": f"Analiza este documento:\n\n{raw_text[:8000]}"
-                })
+                user_message = f"Analiza este documento:\n\n{raw_text[:8000]}"
             
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model=self.model,
-                messages=messages,
-                max_tokens=2000,
-                temperature=0.3
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message}
+                ]
             )
             
             result_text = response.choices[0].message.content.strip()
@@ -406,6 +512,15 @@ Responde ÚNICAMENTE con un JSON en el siguiente formato:
             "png": "image/png"
         }
         return content_types.get(ext, "application/octet-stream")
+    
+    def close(self):
+        """Close database session."""
+        if self.db:
+            self.db.close()
+    
+    def __del__(self):
+        """Cleanup when service is destroyed."""
+        self.close()
 
 
 @lru_cache()

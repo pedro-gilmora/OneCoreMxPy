@@ -64,6 +64,7 @@ RUN chmod +x scripts/*.sh 2>/dev/null || true
 
 # Copy entrypoint script
 COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN dos2unix /docker-entrypoint.sh 2>/dev/null || sed -i 's/\r$//' /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
 # Create non-root user for security
