@@ -397,23 +397,28 @@ async def delete_document(
     s3_service = get_s3_service()
     await s3_service.delete_file(document.s3_key)
     
-    # Delete related data
+    # Save filename before deletion for logging
+    filename_for_log = document.original_filename
+    
+    # Delete related data (must delete event logs first to avoid FK constraint violation)
+    from app.models.models import EventLog
+    db.query(EventLog).filter(EventLog.document_id == document_id).delete()
     db.query(InvoiceData).filter(InvoiceData.document_id == document_id).delete()
     db.query(InfoData).filter(InfoData.document_id == document_id).delete()
     
-    # Log event
+    # Delete document
+    db.delete(document)
+    db.commit()
+    
+    # Log event after deletion is successful (without document_id to avoid FK violation)
     event_service = get_event_service()
     event_service.log_user_interaction(
         db=db,
         action="Eliminación de documento",
         user_id=current_user.id,
-        document_id=document_id,
-        details={"filename": document.original_filename}
+        document_id=None,  # Don't reference the deleted document
+        details={"filename": filename_for_log}
     )
-    
-    # Delete document
-    db.delete(document)
-    db.commit()
     
     return MessageResponse(
         message="Documento eliminado exitosamente",
